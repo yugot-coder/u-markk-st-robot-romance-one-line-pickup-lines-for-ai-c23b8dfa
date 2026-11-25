@@ -43,9 +43,13 @@ def validate_entry(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def main() -> int:
-    expected = validate_entry(FINAL_LINE)
+def write_entry(expected: str) -> str:
+    """Write FINAL_LINE to entry.txt and verify the bytes read back.
 
+    The read-back must have exactly the intended UTF-8 byte length, no
+    trailing newline, decode to the same line, and hash to the expected
+    digest. Returns the verified line.
+    """
     out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "entry.txt")
@@ -54,14 +58,26 @@ def main() -> int:
 
     with open(path, "rb") as handle:
         raw = handle.read()
+    if len(raw) != len(FINAL_LINE.encode("utf-8")):
+        raise SystemExit("entry.txt byte length differs from the line")
+    if raw.endswith(b"\n") or raw.endswith(b"\r"):
+        raise SystemExit("entry.txt must not end with a newline")
     written = raw.decode("utf-8")
     digest = validate_entry(written)
     if digest != expected:
         raise SystemExit(
             "entry.txt digest %s != expected %s" % (digest, expected)
         )
+    if written != FINAL_LINE:
+        raise SystemExit("entry.txt content differs from FINAL_LINE")
+    return written
+
+
+def main() -> int:
+    expected = validate_entry(FINAL_LINE)
+    written = write_entry(expected)
     print(
-        "entry.txt OK: %d chars, sha256 %s" % (len(written), digest)
+        "entry.txt OK: %d chars, sha256 %s" % (len(written), expected)
     )
     return 0
 
